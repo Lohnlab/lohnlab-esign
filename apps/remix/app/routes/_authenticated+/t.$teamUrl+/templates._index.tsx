@@ -1,22 +1,36 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { msg } from '@lingui/core/macro';
+import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
-import { EnvelopeType, OrganisationType } from '@prisma/client';
-import { Bird, LinkIcon } from 'lucide-react';
+import { EnvelopeType, OrganisationType, TemplateType } from '@prisma/client';
+import { Bird, FilterIcon, SearchIcon } from 'lucide-react';
 import { parseAsStringLiteral, useQueryState } from 'nuqs';
 import { useParams, useSearchParams } from 'react-router';
 
+import { useDebouncedValue } from '@documenso/lib/client-only/hooks/use-debounced-value';
 import { useSessionStorage } from '@documenso/lib/client-only/hooks/use-session-storage';
 import { useCurrentOrganisation } from '@documenso/lib/client-only/providers/organisation';
 import { FolderType } from '@documenso/lib/types/folder-type';
-import { formatAvatarUrl } from '@documenso/lib/utils/avatars';
 import { formatDocumentsPath, formatTemplatesPath } from '@documenso/lib/utils/teams';
 import { trpc } from '@documenso/trpc/react';
-import { Avatar, AvatarFallback, AvatarImage } from '@documenso/ui/primitives/avatar';
+import { Badge } from '@documenso/ui/primitives/badge';
 import { Button } from '@documenso/ui/primitives/button';
 import type { RowSelectionState } from '@documenso/ui/primitives/data-table';
-import { Tabs, TabsList, TabsTrigger } from '@documenso/ui/primitives/tabs';
+import { Input } from '@documenso/ui/primitives/input';
+import { Label } from '@documenso/ui/primitives/label';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@documenso/ui/primitives/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@documenso/ui/primitives/select';
 
 import hubspotLogoDark from '../../../../../../packages/assets/hubspot-logo-dark.png';
 import hubspotLogoLight from '../../../../../../packages/assets/hubspot-logo-light.png';
@@ -25,7 +39,9 @@ import { EnvelopesBulkDeleteDialog } from '~/components/dialogs/envelopes-bulk-d
 import { EnvelopesBulkMoveDialog } from '~/components/dialogs/envelopes-bulk-move-dialog';
 import { HubspotGuidanceDialog } from '~/components/dialogs/hubspot-guidance-dialog';
 import { EnvelopeDropZoneWrapper } from '~/components/general/envelope/envelope-drop-zone-wrapper';
+import { EnvelopeUploadButton } from '~/components/general/envelope/envelope-upload-button';
 import { FolderGrid } from '~/components/general/folder/folder-grid';
+import { PeriodSelector } from '~/components/general/period-selector';
 import { EnvelopesTableBulkActionBar } from '~/components/tables/envelopes-table-bulk-action-bar';
 import { TemplatesTable } from '~/components/tables/templates-table';
 import { useCurrentTeam } from '~/providers/team';
@@ -33,29 +49,48 @@ import { appMetaTags } from '~/utils/meta';
 
 const TEMPLATE_VIEWS = ['team', 'organisation'] as const;
 
-type TemplateView = (typeof TEMPLATE_VIEWS)[number];
-
 export function meta() {
   return appMetaTags(msg`Templates`);
 }
 
 export default function TemplatesPage() {
+  const { _ } = useLingui();
   const team = useCurrentTeam();
   const organisation = useCurrentOrganisation();
 
   const { folderId } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const page = Number(searchParams.get('page')) || 1;
   const perPage = Number(searchParams.get('perPage')) || 10;
+  const queryParam = searchParams.get('query') || '';
+
+  const [searchTerm, setSearchTerm] = useState(queryParam);
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 500);
+
+  useEffect(() => {
+    const currentQuery = searchParams.get('query') || '';
+    if (debouncedSearchTerm !== currentQuery) {
+      const params = new URLSearchParams(searchParams.toString());
+      if (debouncedSearchTerm) {
+        params.set('query', debouncedSearchTerm);
+      } else {
+        params.delete('query');
+      }
+      params.delete('page');
+      setSearchParams(params);
+    }
+  }, [debouncedSearchTerm]);
 
   const [view, setView] = useQueryState(
     'view',
     parseAsStringLiteral(TEMPLATE_VIEWS).withDefault('team'),
   );
 
+  const [typeFilter, setTypeFilter] = useQueryState('type');
+
   const isOrgView = view === 'organisation';
-  const showOrgTab = organisation.type !== OrganisationType.PERSONAL;
+  const showOrgFilter = organisation.type !== OrganisationType.PERSONAL;
 
   const [rowSelection, setRowSelection] = useSessionStorage<RowSelectionState>(
     'templates-bulk-selection',
@@ -74,11 +109,32 @@ export default function TemplatesPage() {
   const documentRootPath = formatDocumentsPath(team.url);
   const templateRootPath = formatTemplatesPath(team.url);
 
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (isOrgView) {
+      count += 1;
+    }
+    if (typeFilter) {
+      count += 1;
+    }
+    const period = searchParams.get('period');
+    if (period && period !== 'all') {
+      count += 1;
+    }
+    return count;
+  }, [isOrgView, typeFilter, searchParams]);
+
+  const resolvedType = typeFilter
+    ? (typeFilter.toUpperCase() as TemplateType)
+    : undefined;
+
   const teamTemplatesQuery = trpc.template.findTemplates.useQuery(
     {
       page,
       perPage,
       folderId,
+      query: debouncedSearchTerm || undefined,
+      type: resolvedType,
     },
     {
       enabled: !isOrgView,
@@ -89,6 +145,7 @@ export default function TemplatesPage() {
     {
       page,
       perPage,
+      query: debouncedSearchTerm || undefined,
     },
     {
       enabled: isOrgView,
@@ -97,13 +154,17 @@ export default function TemplatesPage() {
 
   const activeQuery = isOrgView ? orgTemplatesQuery : teamTemplatesQuery;
 
-  const handleViewChange = (newView: string) => {
+  const handleViewChange = useCallback((newView: string) => {
     if (newView !== 'team' && newView !== 'organisation') {
       return;
     }
 
     void setView(newView === 'team' ? null : newView);
-  };
+  }, [setView]);
+
+  const handleTypeChange = useCallback((newType: string) => {
+    void setTypeFilter(newType === 'all' ? null : newType);
+  }, [setTypeFilter]);
 
   return (
     <EnvelopeDropZoneWrapper type={EnvelopeType.TEMPLATE}>
@@ -111,68 +172,119 @@ export default function TemplatesPage() {
         {!isOrgView && <FolderGrid type={FolderType.TEMPLATE} parentId={folderId ?? null} />}
 
         <div className="mt-8">
-          <div className="flex flex-row items-center justify-between">
-            <div className="flex flex-row items-center">
-              <Avatar className="mr-3 h-12 w-12 border-2 border-solid border-white dark:border-border">
-                {team.avatarImageId && <AvatarImage src={formatAvatarUrl(team.avatarImageId)} />}
-                <AvatarFallback className="text-xs text-muted-foreground">
-                  {team.name.slice(0, 1)}
-                </AvatarFallback>
-              </Avatar>
+          <h1 className="text-3xl font-semibold md:text-4xl">
+            <Trans>Templates</Trans>
+          </h1>
 
-              <h1 className="truncate text-2xl font-semibold md:text-3xl">
-                <Trans>Templates</Trans>
-              </h1>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="relative w-full max-w-sm md:max-w-md">
+              <SearchIcon className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+              <Input
+                type="search"
+                className="h-10 pl-9"
+                placeholder={_(msg`Vorlagen suchen...`)}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="h-10 gap-2">
+                  <FilterIcon className="h-4 w-4" />
+                  <Trans>Filter</Trans>
+                  {activeFilterCount > 0 && (
+                    <Badge variant="secondary" className="ml-1 h-5 min-w-[20px] rounded-full px-1.5 text-xs">
+                      {activeFilterCount}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 space-y-4" align="start">
+                {showOrgFilter && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      <Trans>Scope</Trans>
+                    </Label>
+                    <Select value={view} onValueChange={handleViewChange}>
+                      <SelectTrigger className="h-9" data-testid="template-view-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="team" data-testid="template-tab-team">
+                          Team
+                        </SelectItem>
+                        <SelectItem value="organisation" data-testid="template-tab-organisation">
+                          <Trans>Organisation</Trans>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    <Trans>Type</Trans>
+                  </Label>
+                  <Select value={typeFilter || 'all'} onValueChange={handleTypeChange}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">
+                        <Trans>All</Trans>
+                      </SelectItem>
+                      <SelectItem value={TemplateType.PUBLIC}>
+                        <Trans>Public</Trans>
+                      </SelectItem>
+                      <SelectItem value={TemplateType.PRIVATE}>
+                        <Trans>Private</Trans>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    <Trans>Period</Trans>
+                  </Label>
+                  <PeriodSelector />
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {!folderId && (
+              <EnvelopeUploadButton type={EnvelopeType.TEMPLATE} />
+            )}
 
             <Button
               variant="outline"
-              size="sm"
-              className="gap-2"
+              className="h-10 gap-2 px-3"
               onClick={() => setShowHubspotGuide(true)}
             >
-              <Trans>In</Trans>
               <img src={hubspotLogoDark} alt="HubSpot" className="h-8 dark:hidden" />
               <img src={hubspotLogoLight} alt="HubSpot" className="hidden h-8 dark:block" />
-              <Trans>einbinden</Trans>
             </Button>
           </div>
 
-          {showOrgTab && (
-            <div className="mt-6">
-              <Tabs value={view} onValueChange={handleViewChange} data-testid="template-view-tabs">
-                <TabsList>
-                  <TabsTrigger
-                    className="min-w-[60px] hover:text-foreground"
-                    value="team"
-                    data-testid="template-tab-team"
-                  >
-                    <Trans>Team</Trans>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    className="min-w-[60px] hover:text-foreground"
-                    value="organisation"
-                    data-testid="template-tab-organisation"
-                  >
-                    <Trans>Organisation</Trans>
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-          )}
-
-          <div className="mt-8">
+          <div className="mt-6">
             {activeQuery.data && activeQuery.data.count === 0 ? (
               <div className="flex h-96 flex-col items-center justify-center gap-y-4 text-muted-foreground/60">
                 <Bird className="h-12 w-12" strokeWidth={1.5} />
 
                 <div className="text-center">
                   <h3 className="text-lg font-semibold">
-                    <Trans>No templates yet</Trans>
+                    {debouncedSearchTerm ? (
+                      <Trans>Keine Vorlagen gefunden</Trans>
+                    ) : (
+                      <Trans>No templates yet</Trans>
+                    )}
                   </h3>
 
                   <p className="mt-2 max-w-[50ch]">
-                    {isOrgView ? (
+                    {debouncedSearchTerm ? (
+                      <Trans>Für deine Suche wurden keine Vorlagen gefunden.</Trans>
+                    ) : isOrgView ? (
                       <Trans>No organisation templates have been shared with your team yet.</Trans>
                     ) : (
                       <Trans>

@@ -23,7 +23,7 @@ export const getRootHref = (
   options: GetRootHrefOptions = {},
 ) => {
   if (typeof params?.teamUrl === 'string') {
-    return `/t/${params.teamUrl}`;
+    return `/t/${params.teamUrl}/documents`;
   }
 
   return options.returnEmptyRootString ? '' : '/';

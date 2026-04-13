@@ -84,6 +84,7 @@ export const templateRouter = router({
       ctx.logger.info({
         input: {
           folderId: input.folderId,
+          query: input.query,
         },
       });
 

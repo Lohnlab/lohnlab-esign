@@ -37,7 +37,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
     let currentTeam = teams.find((team) => team.url === preferredTeamUrl);
 
-    if (!currentTeam && teams.length === 1) {
+    if (!currentTeam && teams.length > 0) {
       currentTeam = teams[0];
     }
 
