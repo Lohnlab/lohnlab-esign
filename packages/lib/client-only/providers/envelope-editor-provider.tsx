@@ -137,8 +137,8 @@ export const EnvelopeEditorProvider = ({
 
   const handleFieldOverlap = useCallback(() => {
     toast({
-      title: t`Field repositioned`,
-      description: t`The field was moved to avoid overlapping with another field.`,
+      title: t`Feld verschoben`,
+      description: t`Das Feld wurde verschoben, um eine Überlappung mit einem anderen Feld zu vermeiden.`,
       duration: 3000,
     });
   }, [toast, t]);
