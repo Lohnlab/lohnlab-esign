@@ -1,9 +1,10 @@
 import { type HTMLAttributes, useEffect, useState } from 'react';
 
 import { ReadStatus } from '@prisma/client';
-import { InboxIcon, MenuIcon, SearchIcon } from 'lucide-react';
+import { InboxIcon, MenuIcon, SettingsIcon } from 'lucide-react';
 import { Link, useParams } from 'react-router';
 
+import { useOptionalCurrentOrganisation } from '@documenso/lib/client-only/providers/organisation';
 import { useSession } from '@documenso/lib/client-only/providers/session';
 import { isPersonalLayout } from '@documenso/lib/utils/organisations';
 import { getRootHref } from '@documenso/lib/utils/params';
@@ -12,12 +13,13 @@ import { cn } from '@documenso/ui/lib/utils';
 import { Button } from '@documenso/ui/primitives/button';
 
 import { BrandingLogo } from '~/components/general/branding-logo';
+import { useOptionalCurrentTeam } from '~/providers/team';
 
-import { AppCommandMenu } from './app-command-menu';
 import { AppNavDesktop } from './app-nav-desktop';
 import { AppNavMobile } from './app-nav-mobile';
 import { MenuSwitcher } from './menu-switcher';
 import { OrgMenuSwitcher } from './org-menu-switcher';
+import { TeamSwitcher } from './team-switcher';
 
 export type HeaderProps = HTMLAttributes<HTMLDivElement>;
 
@@ -26,9 +28,17 @@ export const Header = ({ className, ...props }: HeaderProps) => {
 
   const { organisations } = useSession();
 
-  const [isCommandMenuOpen, setIsCommandMenuOpen] = useState(false);
+  const currentTeam = useOptionalCurrentTeam();
+  const currentOrganisation = useOptionalCurrentOrganisation();
+
   const [isHamburgerMenuOpen, setIsHamburgerMenuOpen] = useState(false);
   const [scrollY, setScrollY] = useState(0);
+
+  const settingsHref = currentTeam
+    ? `/t/${currentTeam.url}/settings`
+    : currentOrganisation
+      ? `/o/${currentOrganisation.url}/settings`
+      : '/settings/profile';
 
   const { data: unreadCountData } = trpc.document.inbox.getCount.useQuery(
     {
@@ -66,34 +76,38 @@ export const Header = ({ className, ...props }: HeaderProps) => {
           <BrandingLogo logoClassName="h-6 w-auto" />
         </Link>
 
-        <AppNavDesktop setIsCommandMenuOpen={setIsCommandMenuOpen} />
+        <AppNavDesktop />
 
-        <Button asChild variant="outline" className="relative hidden h-10 w-10 rounded-lg md:flex">
-          <Link to="/inbox" className="relative block h-10 w-10">
-            <InboxIcon className="h-5 w-5 flex-shrink-0 text-muted-foreground transition-colors hover:text-foreground" />
+        <div className="hidden items-center md:flex md:mx-auto">
+          {!isPersonalLayout(organisations) && <TeamSwitcher />}
+        </div>
 
-            {unreadCountData && unreadCountData.count > 0 && (
-              <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
-                {unreadCountData.count > 99 ? '99+' : unreadCountData.count}
-              </span>
-            )}
-          </Link>
-        </Button>
+        <div className="hidden items-center gap-x-2 md:flex">
+          <Button asChild variant="outline" className="relative h-10 w-10 rounded-lg">
+            <Link to="/inbox" className="relative block h-10 w-10">
+              <InboxIcon className="h-5 w-5 flex-shrink-0 text-muted-foreground transition-colors hover:text-foreground" />
 
-        <div className="md:ml-4">
+              {unreadCountData && unreadCountData.count > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                  {unreadCountData.count > 99 ? '99+' : unreadCountData.count}
+                </span>
+              )}
+            </Link>
+          </Button>
+
+          <Button asChild variant="outline" className="relative h-10 w-10 rounded-lg">
+            <Link to={settingsHref} className="relative block h-10 w-10">
+              <SettingsIcon className="h-5 w-5 flex-shrink-0 text-muted-foreground transition-colors hover:text-foreground" />
+            </Link>
+          </Button>
+
           {isPersonalLayout(organisations) ? <MenuSwitcher /> : <OrgMenuSwitcher />}
         </div>
 
         <div className="flex flex-row items-center space-x-4 md:hidden">
-          <button onClick={() => setIsCommandMenuOpen(true)}>
-            <SearchIcon className="h-6 w-6 text-muted-foreground" />
-          </button>
-
           <button onClick={() => setIsHamburgerMenuOpen(true)}>
             <MenuIcon className="h-6 w-6 text-muted-foreground" />
           </button>
-
-          <AppCommandMenu open={isCommandMenuOpen} onOpenChange={setIsCommandMenuOpen} />
 
           <AppNavMobile
             isMenuOpen={isHamburgerMenuOpen}

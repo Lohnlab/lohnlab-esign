@@ -234,6 +234,7 @@ export const setFieldsForDocument = async ({
             width: field.pageWidth,
             height: field.pageHeight,
             fieldMeta: parsedFieldMeta,
+            recipientId: field._recipient.id,
           },
           create: {
             type: field.type,
@@ -390,6 +391,7 @@ const hasFieldBeenChanged = (field: Field, newFieldData: FieldData) => {
   return (
     field.envelopeItemId !== newFieldData.envelopeItemId ||
     field.type !== newFieldData.type ||
+    field.recipientId !== newFieldData.recipientId ||
     field.page !== newFieldData.pageNumber ||
     field.positionX.toNumber() !== newFieldData.pageX ||
     field.positionY.toNumber() !== newFieldData.pageY ||

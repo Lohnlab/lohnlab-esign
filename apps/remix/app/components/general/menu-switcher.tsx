@@ -1,9 +1,7 @@
 import { useState } from 'react';
 
-import { msg } from '@lingui/core/macro';
-import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
-import { ChevronsUpDown, Plus } from 'lucide-react';
+import { ChevronsUpDown, LogOutIcon, Plus, UserIcon } from 'lucide-react';
 import { Link } from 'react-router';
 
 import { authClient } from '@documenso/auth/client';
@@ -12,7 +10,6 @@ import { formatAvatarUrl } from '@documenso/lib/utils/avatars';
 import { isAdmin } from '@documenso/lib/utils/is-admin';
 import { extractInitials } from '@documenso/lib/utils/recipient-formatter';
 import { LanguageSwitcherDialog } from '@documenso/ui/components/common/language-switcher-dialog';
-import { cn } from '@documenso/ui/lib/utils';
 import { AvatarWithText } from '@documenso/ui/primitives/avatar';
 import { Button } from '@documenso/ui/primitives/button';
 import {
@@ -24,21 +21,15 @@ import {
 } from '@documenso/ui/primitives/dropdown-menu';
 
 export const MenuSwitcher = () => {
-  const { _ } = useLingui();
-
   const { user } = useSession();
 
   const [languageSwitcherOpen, setLanguageSwitcherOpen] = useState(false);
 
   const isUserAdmin = isAdmin(user);
 
-  const formatAvatarFallback = (name?: string) => {
-    if (name !== undefined) {
-      return name.slice(0, 1).toUpperCase();
-    }
-
-    return user.name ? extractInitials(user.name) : user.email.slice(0, 1).toUpperCase();
-  };
+  const avatarFallback = user.name
+    ? extractInitials(user.name)
+    : user.email.slice(0, 1).toUpperCase();
 
   return (
     <DropdownMenu>
@@ -50,9 +41,8 @@ export const MenuSwitcher = () => {
         >
           <AvatarWithText
             avatarSrc={formatAvatarUrl(user.avatarImageId)}
-            avatarFallback={formatAvatarFallback(user.name || user.email)}
+            avatarFallback={avatarFallback}
             primaryText={user.name}
-            secondaryText={_(msg`Personal Account`)}
             rightSideComponent={
               <ChevronsUpDown className="text-muted-foreground ml-auto h-4 w-4" />
             }
@@ -62,52 +52,57 @@ export const MenuSwitcher = () => {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
-        className={cn('z-[60] ml-6 w-full min-w-[12rem] md:ml-0')}
+        className="z-[60] ml-6 w-56 md:ml-0"
         align="end"
-        forceMount
       >
-        <DropdownMenuItem className="text-muted-foreground px-4 py-2" asChild>
-          <Link
-            to="/settings/organisations?action=add-organisation"
-            className="flex items-center justify-between"
-          >
-            <Trans>Create Organisation</Trans>
-            <Plus className="ml-2 h-4 w-4" />
-          </Link>
-        </DropdownMenuItem>
+        <div className="px-3 py-2">
+          <p className="text-sm font-medium">{user.name}</p>
+          <p className="text-muted-foreground text-xs">{user.email}</p>
+        </div>
+
         <DropdownMenuSeparator />
 
         {isUserAdmin && (
-          <DropdownMenuItem className="text-muted-foreground px-4 py-2" asChild>
+          <DropdownMenuItem className="text-muted-foreground px-3 py-2" asChild>
             <Link to="/admin">
               <Trans>Admin panel</Trans>
             </Link>
           </DropdownMenuItem>
         )}
 
-        <DropdownMenuItem className="text-muted-foreground px-4 py-2" asChild>
-          <Link to="/inbox">
-            <Trans>Personal Inbox</Trans>
-          </Link>
-        </DropdownMenuItem>
-
-        <DropdownMenuItem className="text-muted-foreground px-4 py-2" asChild>
+        <DropdownMenuItem className="text-muted-foreground px-3 py-2" asChild>
           <Link to="/settings/profile">
-            <Trans>User settings</Trans>
+            <UserIcon className="mr-2 h-4 w-4" />
+            <Trans>Account</Trans>
           </Link>
         </DropdownMenuItem>
 
         <DropdownMenuItem
-          className="text-muted-foreground px-4 py-2"
+          className="text-muted-foreground px-3 py-2"
           onClick={() => setLanguageSwitcherOpen(true)}
         >
           <Trans>Language</Trans>
         </DropdownMenuItem>
 
+        <DropdownMenuSeparator />
+
+        <DropdownMenuItem className="text-muted-foreground px-3 py-2" asChild>
+          <Link
+            to="/settings/organisations?action=add-organisation"
+            className="flex items-center"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            <Trans>Create Organisation</Trans>
+          </Link>
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+
         <DropdownMenuItem
-          className="text-destructive/90 hover:!text-destructive px-4 py-2"
+          className="text-destructive/80 hover:!text-destructive px-3 py-2"
           onSelect={async () => authClient.signOut()}
         >
+          <LogOutIcon className="mr-2 h-4 w-4" />
           <Trans>Sign Out</Trans>
         </DropdownMenuItem>
       </DropdownMenuContent>

@@ -39,6 +39,7 @@ export type TEditorFieldsFormSchema = z.infer<typeof ZEditorFieldsFormSchema>;
 type EditorFieldsProps = {
   envelope: TEditorEnvelope;
   handleFieldsUpdate: (fields: TLocalField[]) => unknown;
+  onFieldOverlap?: () => void;
 };
 
 type UseEditorFieldsResponse = {
@@ -70,6 +71,7 @@ type UseEditorFieldsResponse = {
 export const useEditorFields = ({
   envelope,
   handleFieldsUpdate,
+  onFieldOverlap,
 }: EditorFieldsProps): UseEditorFieldsResponse => {
   const [selectedFieldFormId, setSelectedFieldFormId] = useState<string | null>(null);
   const [selectedRecipientId, setSelectedRecipientId] = useState<number | null>(null);
@@ -141,10 +143,25 @@ export const useEditorFields = ({
 
   const addField = useCallback(
     (fieldData: Omit<TLocalField, 'formId'>): TLocalField => {
+      const restricted = restrictFieldPosValues(fieldData);
+
+      const samePageFields = localFields.filter(
+        (f) => f.page === fieldData.page && f.envelopeItemId === fieldData.envelopeItemId,
+      );
+
+      const { wasAdjusted, ...resolvedPos } = resolveFieldOverlap(
+        restricted,
+        samePageFields,
+      );
+
+      if (wasAdjusted) {
+        onFieldOverlap?.();
+      }
+
       const field: TLocalField = {
         ...fieldData,
         formId: nanoid(12),
-        ...restrictFieldPosValues(fieldData),
+        ...resolvedPos,
       };
 
       append(field);
@@ -152,7 +169,7 @@ export const useEditorFields = ({
       setSelectedField(field.formId, true);
       return field;
     },
-    [append, triggerFieldsUpdate, setSelectedField],
+    [append, triggerFieldsUpdate, setSelectedField, localFields, onFieldOverlap],
   );
 
   const removeFieldsByFormId = useCallback(
@@ -192,38 +209,84 @@ export const useEditorFields = ({
           ...updates,
         };
 
+        const restricted = restrictFieldPosValues(updatedField);
+
+        const hasPositionChange =
+          updates.positionX !== undefined ||
+          updates.positionY !== undefined ||
+          updates.width !== undefined ||
+          updates.height !== undefined;
+
+        let finalPos = restricted;
+
+        if (hasPositionChange) {
+          const samePageFields = localFields.filter(
+            (f) =>
+              f.page === updatedField.page && f.envelopeItemId === updatedField.envelopeItemId,
+          );
+
+          const { wasAdjusted, ...resolvedPos } = resolveFieldOverlap(
+            restricted,
+            samePageFields,
+            formId,
+          );
+
+          if (wasAdjusted) {
+            onFieldOverlap?.();
+          }
+
+          finalPos = resolvedPos;
+        }
+
         update(index, {
           ...updatedField,
-          ...restrictFieldPosValues(updatedField),
+          ...finalPos,
         });
         triggerFieldsUpdate();
       }
     },
-    [localFields, update, triggerFieldsUpdate],
+    [localFields, update, triggerFieldsUpdate, onFieldOverlap],
   );
 
   const duplicateField = useCallback(
     (field: TLocalField): TLocalField => {
+      const candidatePos = restrictFieldPosValues({
+        positionX: field.positionX + 3,
+        positionY: field.positionY + 3,
+        width: field.width,
+        height: field.height,
+      });
+
+      const samePageFields = localFields.filter(
+        (f) => f.page === field.page && f.envelopeItemId === field.envelopeItemId,
+      );
+
+      const { wasAdjusted, ...resolvedPos } = resolveFieldOverlap(candidatePos, samePageFields);
+
+      if (wasAdjusted) {
+        onFieldOverlap?.();
+      }
+
       const newField: TLocalField = {
         ...structuredClone(field),
         id: undefined,
         formId: nanoid(12),
         recipientId: field.recipientId,
-        positionX: field.positionX + 3,
-        positionY: field.positionY + 3,
+        ...resolvedPos,
       };
 
       append(newField);
       triggerFieldsUpdate();
       return newField;
     },
-    [append, triggerFieldsUpdate],
+    [append, triggerFieldsUpdate, localFields, onFieldOverlap],
   );
 
   const duplicateFieldToAllPages = useCallback(
     (field: TLocalField): TLocalField[] => {
       const totalPages = getPdfPagesCount();
       const newFields: TLocalField[] = [];
+      let hadOverlap = false;
 
       if (totalPages < 1) {
         return newFields;
@@ -234,21 +297,42 @@ export const useEditorFields = ({
           continue;
         }
 
+        const samePageFields = [
+          ...localFields.filter(
+            (f) => f.page === pageNumber && f.envelopeItemId === field.envelopeItemId,
+          ),
+          ...newFields.filter((f) => f.page === pageNumber),
+        ];
+
+        const { wasAdjusted, ...resolvedPos } = resolveFieldOverlap(
+          { positionX: field.positionX, positionY: field.positionY, width: field.width, height: field.height },
+          samePageFields,
+        );
+
+        if (wasAdjusted) {
+          hadOverlap = true;
+        }
+
         const newField: TLocalField = {
           ...structuredClone(field),
           id: undefined,
           formId: nanoid(12),
           page: pageNumber,
+          ...resolvedPos,
         };
 
         append(newField);
         newFields.push(newField);
       }
 
+      if (hadOverlap) {
+        onFieldOverlap?.();
+      }
+
       triggerFieldsUpdate();
       return newFields;
     },
-    [append, triggerFieldsUpdate],
+    [append, triggerFieldsUpdate, localFields, onFieldOverlap],
   );
 
   const getFieldByFormId = useCallback(
@@ -328,4 +412,62 @@ const restrictFieldPosValues = (
     width: Math.max(0, Math.min(100, field.width)),
     height: Math.max(0, Math.min(100, field.height)),
   };
+};
+
+type FieldRect = Pick<TLocalField, 'positionX' | 'positionY' | 'width' | 'height'>;
+
+const OVERLAP_GAP = 0.5;
+
+const doFieldsOverlap = (a: FieldRect, b: FieldRect): boolean => {
+  return (
+    a.positionX < b.positionX + b.width &&
+    a.positionX + a.width > b.positionX &&
+    a.positionY < b.positionY + b.height &&
+    a.positionY + a.height > b.positionY
+  );
+};
+
+/**
+ * Resolve overlap by shifting the field to the right of the blocking field.
+ * If it goes beyond the page boundary, wrap to the next row.
+ */
+export const resolveFieldOverlap = (
+  field: FieldRect,
+  otherFields: (FieldRect & { formId: string })[],
+  excludeFormId?: string,
+): FieldRect & { wasAdjusted: boolean } => {
+  let adjusted = { ...field };
+  let wasAdjusted = false;
+  let iterations = 0;
+  const maxIterations = 50;
+
+  while (iterations < maxIterations) {
+    const blocker = otherFields.find(
+      (other) => other.formId !== excludeFormId && doFieldsOverlap(adjusted, other),
+    );
+
+    if (!blocker) {
+      break;
+    }
+
+    wasAdjusted = true;
+
+    let newX = blocker.positionX + blocker.width + OVERLAP_GAP;
+    let newY = adjusted.positionY;
+
+    if (newX + adjusted.width > 100) {
+      newX = 0;
+      newY = blocker.positionY + blocker.height + OVERLAP_GAP;
+    }
+
+    if (newY + adjusted.height > 100) {
+      newY = 0;
+      newX = 0;
+    }
+
+    adjusted = { ...adjusted, positionX: newX, positionY: newY };
+    iterations++;
+  }
+
+  return { ...adjusted, wasAdjusted };
 };

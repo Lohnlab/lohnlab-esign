@@ -135,9 +135,18 @@ export const EnvelopeEditorProvider = ({
 
   const isEmbedded = editorConfig.embedded !== undefined;
 
+  const handleFieldOverlap = useCallback(() => {
+    toast({
+      title: t`Field repositioned`,
+      description: t`The field was moved to avoid overlapping with another field.`,
+      duration: 3000,
+    });
+  }, [toast, t]);
+
   const editorFields = useEditorFields({
     envelope,
     handleFieldsUpdate: (fields) => setFieldsDebounced(fields),
+    onFieldOverlap: handleFieldOverlap,
   });
 
   const editorRecipients = useEditorRecipients({

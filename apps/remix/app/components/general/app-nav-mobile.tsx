@@ -1,15 +1,21 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useLingui } from '@lingui/react/macro';
 import { Trans } from '@lingui/react/macro';
 import { ReadStatus } from '@prisma/client';
-import { Link } from 'react-router';
+import { Building2Icon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
+import { Link, useNavigate } from 'react-router';
 
 import LogoImage from '@documenso/assets/logo.png';
 import { authClient } from '@documenso/auth/client';
+import { useOptionalCurrentOrganisation } from '@documenso/lib/client-only/providers/organisation';
 import { useSession } from '@documenso/lib/client-only/providers/session';
 import { isPersonalLayout } from '@documenso/lib/utils/organisations';
+import { formatAvatarUrl } from '@documenso/lib/utils/avatars';
+import { formatDocumentsPath } from '@documenso/lib/utils/teams';
+import { cn } from '@documenso/ui/lib/utils';
 import { trpc } from '@documenso/trpc/react';
+import { Avatar, AvatarFallback, AvatarImage } from '@documenso/ui/primitives/avatar';
 import { Sheet, SheetContent } from '@documenso/ui/primitives/sheet';
 import { ThemeSwitcher } from '@documenso/ui/primitives/theme-switcher';
 
@@ -22,10 +28,15 @@ export type AppNavMobileProps = {
 
 export const AppNavMobile = ({ isMenuOpen, onMenuOpenChange }: AppNavMobileProps) => {
   const { t } = useLingui();
+  const navigate = useNavigate();
 
   const { organisations } = useSession();
 
   const currentTeam = useOptionalCurrentTeam();
+  const currentOrganisation = useOptionalCurrentOrganisation();
+
+  const [showTeams, setShowTeams] = useState(false);
+  const [showOrgs, setShowOrgs] = useState(false);
 
   const { data: unreadCountData } = trpc.document.inbox.getCount.useQuery(
     {
@@ -39,6 +50,11 @@ export const AppNavMobile = ({ isMenuOpen, onMenuOpenChange }: AppNavMobileProps
   const handleMenuItemClick = () => {
     onMenuOpenChange?.(false);
   };
+
+  const teams = useMemo(() => {
+    const org = currentOrganisation || organisations[0];
+    return org?.teams || [];
+  }, [currentOrganisation, organisations]);
 
   const menuNavigationLinks = useMemo(() => {
     let teamUrl = currentTeam?.url || null;
@@ -80,10 +96,15 @@ export const AppNavMobile = ({ isMenuOpen, onMenuOpenChange }: AppNavMobileProps
     ];
   }, [currentTeam, organisations]);
 
+  const handleSelectTeam = (teamUrl: string) => {
+    handleMenuItemClick();
+    void navigate(`/t/${teamUrl}/documents`);
+  };
+
   return (
     <Sheet open={isMenuOpen} onOpenChange={onMenuOpenChange}>
       <SheetContent className="flex w-full max-w-[350px] flex-col">
-        <Link to="/" onClick={handleMenuItemClick}>
+        <Link to={currentTeam ? formatDocumentsPath(currentTeam.url) : '/'} onClick={handleMenuItemClick}>
           <img
             src={LogoImage}
             alt="LohnLab eSign"
@@ -93,7 +114,59 @@ export const AppNavMobile = ({ isMenuOpen, onMenuOpenChange }: AppNavMobileProps
           />
         </Link>
 
-        <div className="mt-8 flex w-full flex-col items-start gap-y-4">
+        {!isPersonalLayout(organisations) && teams.length > 0 && (
+          <div className="mt-6">
+            <button
+              className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground"
+              onClick={() => setShowTeams(!showTeams)}
+            >
+              <span className="flex items-center gap-2">
+                {currentTeam && (
+                  <Avatar className="h-5 w-5">
+                    {currentTeam.avatarImageId && (
+                      <AvatarImage src={formatAvatarUrl(currentTeam.avatarImageId)} />
+                    )}
+                    <AvatarFallback className="text-[10px]">
+                      {currentTeam.name.slice(0, 1)}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
+                {currentTeam?.name ?? t`Team`}
+              </span>
+              {showTeams ? (
+                <ChevronUpIcon className="h-4 w-4" />
+              ) : (
+                <ChevronDownIcon className="h-4 w-4" />
+              )}
+            </button>
+            {showTeams && (
+              <div className="mt-2 space-y-1 rounded-md border p-2">
+                {teams.map((team) => (
+                  <button
+                    key={team.id}
+                    className={cn(
+                      'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent',
+                      team.id === currentTeam?.id && 'bg-accent font-medium',
+                    )}
+                    onClick={() => handleSelectTeam(team.url)}
+                  >
+                    <Avatar className="h-5 w-5">
+                      {team.avatarImageId && (
+                        <AvatarImage src={formatAvatarUrl(team.avatarImageId)} />
+                      )}
+                      <AvatarFallback className="text-[10px]">
+                        {team.name.slice(0, 1)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate">{team.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mt-6 flex w-full flex-col items-start gap-y-4">
           {menuNavigationLinks.map(({ href, text }) => (
             <Link
               key={href}
@@ -110,8 +183,42 @@ export const AppNavMobile = ({ isMenuOpen, onMenuOpenChange }: AppNavMobileProps
             </Link>
           ))}
 
+          {!isPersonalLayout(organisations) && organisations.length > 0 && (
+            <div className="w-full">
+              <button
+                className="flex items-center gap-2 text-lg font-medium text-muted-foreground hover:text-foreground"
+                onClick={() => setShowOrgs(!showOrgs)}
+              >
+                <Building2Icon className="h-4 w-4" />
+                <Trans>Organisations</Trans>
+                {showOrgs ? (
+                  <ChevronUpIcon className="h-4 w-4" />
+                ) : (
+                  <ChevronDownIcon className="h-4 w-4" />
+                )}
+              </button>
+              {showOrgs && (
+                <div className="mt-2 space-y-1 rounded-md border p-2">
+                  {organisations.map((org) => (
+                    <Link
+                      key={org.id}
+                      to={`/o/${org.url}`}
+                      className={cn(
+                        'block rounded-sm px-2 py-1.5 text-sm hover:bg-accent',
+                        org.id === currentOrganisation?.id && 'bg-accent font-medium',
+                      )}
+                      onClick={handleMenuItemClick}
+                    >
+                      {org.name}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <button
-            className="text-2xl font-semibold text-foreground hover:text-foreground/80"
+            className="text-2xl font-semibold text-destructive/80 hover:text-destructive"
             onClick={async () => authClient.signOut()}
           >
             <Trans>Sign Out</Trans>

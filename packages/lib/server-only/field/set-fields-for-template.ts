@@ -193,6 +193,7 @@ export const setFieldsForTemplate = async ({
           width: field.pageWidth,
           height: field.pageHeight,
           fieldMeta: parsedFieldMeta,
+          recipientId: field._recipient.id,
         },
         create: {
           type: field.type,

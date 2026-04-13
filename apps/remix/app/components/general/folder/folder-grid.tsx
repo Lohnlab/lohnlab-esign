@@ -72,44 +72,47 @@ export const FolderGrid = ({ type, parentId }: FolderGridProps) => {
   return (
     <div>
       <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div
-          className="flex flex-1 items-center text-sm font-medium text-muted-foreground hover:text-muted-foreground/80"
-          data-testid="folder-grid-breadcrumbs"
-        >
-          <Link to={formatRootPath()} className="flex items-center">
-            <HomeIcon className="mr-2 h-4 w-4" />
-            <Trans>Home</Trans>
-          </Link>
+        {parentId && (
+          <div
+            className="flex flex-1 items-center text-sm font-medium text-muted-foreground hover:text-muted-foreground/80"
+            data-testid="folder-grid-breadcrumbs"
+          >
+            <Link to={formatRootPath()} className="flex items-center">
+              <HomeIcon className="mr-2 h-4 w-4" />
+              <Trans>Home</Trans>
+            </Link>
 
-          {isPending && parentId ? (
-            <div className="flex items-center">
-              <Skeleton className="mx-3 h-4 w-1 rotate-12" />
+            {isPending ? (
+              <div className="flex items-center">
+                <Skeleton className="mx-3 h-4 w-1 rotate-12" />
 
-              <Skeleton className="h-4 w-20" />
-            </div>
-          ) : (
-            foldersData?.breadcrumbs.map((folder) => (
-              <div key={folder.id} className="flex items-center">
-                <span className="px-3">/</span>
-                <Link to={formatBreadCrumbPath(folder.id)} className="flex items-center">
-                  <FolderIcon className="mr-2 h-4 w-4" />
-                  <span>{folder.name}</span>
-                </Link>
+                <Skeleton className="h-4 w-20" />
               </div>
-            ))
-          )}
-        </div>
+            ) : (
+              foldersData?.breadcrumbs.map((folder) => (
+                <div key={folder.id} className="flex items-center">
+                  <span className="px-3">/</span>
+                  <Link to={formatBreadCrumbPath(folder.id)} className="flex items-center">
+                    <FolderIcon className="mr-2 h-4 w-4" />
+                    <span>{folder.name}</span>
+                  </Link>
+                </div>
+              ))
+            )}
+          </div>
+        )}
 
-        <div className="flex gap-4 sm:flex-row sm:justify-end">
-          <EnvelopeUploadButton type={type} folderId={parentId || undefined} />
+        {parentId && (
+          <div className="flex gap-4 sm:flex-row sm:justify-end">
+            <EnvelopeUploadButton type={type} folderId={parentId} />
 
-          {/* If you delete this, delete the component as well. */}
-          {organisation.organisationClaim.flags.allowLegacyEnvelopes && (
-            <DocumentUploadButtonLegacy type={type} />
-          )}
+            {organisation.organisationClaim.flags.allowLegacyEnvelopes && (
+              <DocumentUploadButtonLegacy type={type} />
+            )}
 
-          <FolderCreateDialog type={type} />
-        </div>
+            <FolderCreateDialog type={type} />
+          </div>
+        )}
       </div>
 
       {isPending ? (
@@ -134,16 +137,18 @@ export const FolderGrid = ({ type, parentId }: FolderGridProps) => {
           ))}
         </div>
       ) : foldersData && foldersData.folders.length === 0 ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          <FolderCreateDialog
-            type={type}
-            trigger={
-              <button>
-                <FolderCardEmpty type={type} />
-              </button>
-            }
-          />
-        </div>
+        parentId ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            <FolderCreateDialog
+              type={type}
+              trigger={
+                <button>
+                  <FolderCardEmpty type={type} />
+                </button>
+              }
+            />
+          </div>
+        ) : null
       ) : (
         foldersData && (
           <div key="content" className="space-y-4">
