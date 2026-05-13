@@ -111,6 +111,12 @@ export default defineConfig({
    * See rollup.config.mjs which is used for that.
    */
   build: {
+    ...(process.env.VITE_DEBUG_BUILD === '1'
+      ? {
+          minify: false,
+          sourcemap: true,
+        }
+      : {}),
     rollupOptions: {
       external: [
         '@napi-rs/canvas',

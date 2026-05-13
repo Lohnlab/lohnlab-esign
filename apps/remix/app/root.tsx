@@ -101,18 +101,22 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
   const [theme] = useTheme();
 
   return (
-    <html translate="no" lang={lang} data-theme={theme} className={theme ?? ''}>
+    <html
+      translate="no"
+      lang={lang}
+      data-theme={theme}
+      className={theme ?? ''}
+      suppressHydrationWarning
+    >
       <head>
         <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="google" content="notranslate" />
         <link rel="icon" type="image/x-icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="manifest" href="/site.webmanifest" />
-        <meta name="google" content="notranslate" />
         <Meta />
         <Links />
-        <meta name="google" content="notranslate" />
-        <PreventFlashOnWrongTheme ssrTheme={Boolean(data.theme)} />
 
         {disableAnimations && (
           <style
@@ -122,8 +126,7 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
           />
         )}
 
-        {/* Fix: https://stackoverflow.com/questions/21147149/flash-of-unstyled-content-fouc-in-firefox-only-is-ff-slow-renderer */}
-        <script>0</script>
+        <PreventFlashOnWrongTheme ssrTheme={Boolean(data.theme)} />
       </head>
       <body>
         {/* Global license banner currently disabled. Need to wait until after a few releases. */}

@@ -1,13 +1,16 @@
 import { StrictMode, startTransition, useEffect } from 'react';
 
 import { i18n } from '@lingui/core';
-import { detect, fromHtmlTag } from '@lingui/detect-locale';
 import { I18nProvider } from '@lingui/react';
 import posthog from 'posthog-js';
 import { hydrateRoot } from 'react-dom/client';
 import { HydratedRouter } from 'react-router/dom';
 
 import { extractPostHogConfig } from '@documenso/lib/constants/feature-flags';
+import {
+  APP_I18N_OPTIONS,
+  type SupportedLanguageCodes,
+} from '@documenso/lib/constants/i18n';
 import { dynamicActivate } from '@documenso/lib/utils/i18n';
 
 import './utils/polyfills/promise-with-resolvers';
@@ -27,8 +30,18 @@ function PosthogInit() {
   return null;
 }
 
+const getClientLocaleFromDocument = (): string => {
+  const raw = document.documentElement.getAttribute('lang');
+
+  if (raw && APP_I18N_OPTIONS.supportedLangs.includes(raw as SupportedLanguageCodes)) {
+    return raw;
+  }
+
+  return APP_I18N_OPTIONS.sourceLang;
+};
+
 async function main() {
-  const locale = detect(fromHtmlTag('lang')) || 'en';
+  const locale = getClientLocaleFromDocument();
 
   await dynamicActivate(locale);
 
