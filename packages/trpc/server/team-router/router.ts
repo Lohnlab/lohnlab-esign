@@ -6,6 +6,7 @@ import { resendTeamEmailVerification } from '@documenso/lib/server-only/team/res
 import { updateTeamEmail } from '@documenso/lib/server-only/team/update-team-email';
 
 import { authenticatedProcedure, router } from '../trpc';
+import { checkTeamUrlAccessRoute } from './check-team-url-access';
 import { createTeamRoute } from './create-team';
 import { createTeamGroupsRoute } from './create-team-groups';
 import { createTeamMembersRoute } from './create-team-members';
@@ -17,6 +18,7 @@ import { findTeamMembersRoute } from './find-team-members';
 import { findTeamsRoute } from './find-teams';
 import { getTeamRoute } from './get-team';
 import { getTeamMembersRoute } from './get-team-members';
+import { requestTeamAccessFromAdminRoute } from './request-team-access-from-admin';
 import {
   ZCreateTeamEmailVerificationMutationSchema,
   ZDeleteTeamEmailMutationSchema,
@@ -50,6 +52,11 @@ export const teamRouter = router({
   },
   settings: {
     update: updateTeamSettingsRoute,
+  },
+
+  access: {
+    checkUrl: checkTeamUrlAccessRoute,
+    requestFromAdmin: requestTeamAccessFromAdminRoute,
   },
 
   // Old routes (to be migrated)

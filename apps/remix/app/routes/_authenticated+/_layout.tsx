@@ -15,6 +15,7 @@ import { Header } from '~/components/general/app-header';
 import { GenericErrorLayout } from '~/components/general/generic-error-layout';
 import { OrganisationBillingBanner } from '~/components/general/organisations/organisation-billing-banner';
 import { SourceCodeLink } from '~/components/general/source-code-link';
+import { TeamAccessDeniedScreen } from '~/components/general/team-access-denied-screen';
 import { VerifyEmailBanner } from '~/components/general/verify-email-banner';
 import { TeamProvider } from '~/providers/team';
 
@@ -80,22 +81,20 @@ export default function Layout({ loaderData, params, matches }: Route.ComponentP
       match?.id === 'routes/_authenticated+/t.$teamUrl+/templates.$id.edit',
   );
 
-  if (orgNotFound || teamNotFound) {
+  if (teamNotFound && teamUrl) {
+    return <TeamAccessDeniedScreen teamUrl={teamUrl} />;
+  }
+
+  if (orgNotFound) {
     return (
       <GenericErrorLayout
         errorCode={404}
         errorCodeMap={{
-          404: orgNotFound
-            ? {
-                heading: msg`Organisation not found`,
-                subHeading: msg`404 Organisation not found`,
-                message: msg`The organisation you are looking for may have been removed, renamed or may have never existed.`,
-              }
-            : {
-                heading: msg`Team not found`,
-                subHeading: msg`404 Team not found`,
-                message: msg`The team you are looking for may have been removed, renamed or may have never existed.`,
-              },
+          404: {
+            heading: msg`Organisation not found`,
+            subHeading: msg`404 Organisation not found`,
+            message: msg`The organisation you are looking for may have been removed, renamed or may have never existed.`,
+          },
         }}
         primaryButton={
           <Button asChild>

@@ -209,6 +209,9 @@ export const generateDefaultTeamSettings = (): Omit<TeamGlobalSettings, 'id' | '
     envelopeExpirationPeriod: null,
 
     aiFeaturesEnabled: null,
+
+    domainAutoJoinEnabled: false,
+    domainAutoJoinDomain: null,
   };
 };
 

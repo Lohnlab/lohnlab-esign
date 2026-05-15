@@ -900,6 +900,11 @@ model TeamGlobalSettings {
 
   // AI features settings.
   aiFeaturesEnabled Boolean?
+
+  /// When true, users whose email address ends with @domainAutoJoinDomain are added to this team (and organisation as MEMBER) when they register or when settings are saved.
+  domainAutoJoinEnabled Boolean @default(false)
+  /// Lowercase host only, e.g. "lohnlab.de" (no @).
+  domainAutoJoinDomain String?
 }
 
 model Team {

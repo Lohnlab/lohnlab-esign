@@ -1,10 +1,9 @@
-import { OrganisationGroupType, TeamMemberRole } from '@prisma/client';
-import { match } from 'ts-pattern';
+import type { TeamMemberRole } from '@prisma/client';
 
 import { TEAM_MEMBER_ROLE_PERMISSIONS_MAP } from '@documenso/lib/constants/teams';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
 import { getMemberRoles } from '@documenso/lib/server-only/team/get-member-roles';
-import { generateDatabaseId } from '@documenso/lib/universal/id';
+import { insertOrganisationMembersIntoTeamInternalGroups } from '@documenso/lib/server-only/team/insert-organisation-members-into-team-internal-groups';
 import { buildTeamWhereQuery, isTeamRoleWithinUserHierarchy } from '@documenso/lib/utils/teams';
 import { prisma } from '@documenso/prisma';
 
@@ -65,16 +64,6 @@ export const createTeamMembers = async ({
           },
         },
       },
-      teamGroups: {
-        where: {
-          organisationGroup: {
-            type: OrganisationGroupType.INTERNAL_TEAM,
-          },
-        },
-        include: {
-          organisationGroup: true,
-        },
-      },
     },
   });
 
@@ -91,40 +80,6 @@ export const createTeamMembers = async ({
   if (!isMembersPartOfOrganisation) {
     throw new AppError(AppErrorCode.INVALID_BODY, {
       message: 'Some member IDs do not exist',
-    });
-  }
-
-  const teamMemberGroup = team.teamGroups.find(
-    (group) =>
-      group.organisationGroup.type === OrganisationGroupType.INTERNAL_TEAM &&
-      group.teamId === teamId &&
-      group.teamRole === TeamMemberRole.MEMBER,
-  );
-
-  const teamManagerGroup = team.teamGroups.find(
-    (group) =>
-      group.organisationGroup.type === OrganisationGroupType.INTERNAL_TEAM &&
-      group.teamId === teamId &&
-      group.teamRole === TeamMemberRole.MANAGER,
-  );
-
-  const teamAdminGroup = team.teamGroups.find(
-    (group) =>
-      group.organisationGroup.type === OrganisationGroupType.INTERNAL_TEAM &&
-      group.teamId === teamId &&
-      group.teamRole === TeamMemberRole.ADMIN,
-  );
-
-  if (!teamMemberGroup || !teamManagerGroup || !teamAdminGroup) {
-    console.error({
-      message: 'Team groups not found.',
-      teamMemberGroup: Boolean(teamMemberGroup),
-      teamManagerGroup: Boolean(teamManagerGroup),
-      teamAdminGroup: Boolean(teamAdminGroup),
-    });
-
-    throw new AppError(AppErrorCode.NOT_FOUND, {
-      message: 'Team groups not found.',
     });
   }
 
@@ -146,15 +101,8 @@ export const createTeamMembers = async ({
     });
   }
 
-  await prisma.organisationGroupMember.createMany({
-    data: membersToCreate.map((member) => ({
-      id: generateDatabaseId('group_member'),
-      organisationMemberId: member.organisationMemberId,
-      groupId: match(member.teamRole)
-        .with(TeamMemberRole.MEMBER, () => teamMemberGroup.organisationGroupId)
-        .with(TeamMemberRole.MANAGER, () => teamManagerGroup.organisationGroupId)
-        .with(TeamMemberRole.ADMIN, () => teamAdminGroup.organisationGroupId)
-        .exhaustive(),
-    })),
+  await insertOrganisationMembersIntoTeamInternalGroups({
+    teamId,
+    membersToCreate,
   });
 };

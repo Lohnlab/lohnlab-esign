@@ -48,7 +48,18 @@ export const ZUpdateTeamSettingsRequestSchema = z.object({
     defaultRecipients: ZDefaultRecipientsSchema.nullish(),
     // AI features settings.
     aiFeaturesEnabled: z.boolean().nullish(),
+
+    // Domain-based team auto-join (organisation teams only).
+    domainAutoJoinEnabled: z.boolean().nullish(),
+    domainAutoJoinDomain: z.string().trim().max(253).nullish(),
   }),
 });
 
-export const ZUpdateTeamSettingsResponseSchema = z.void();
+export const ZUpdateTeamSettingsResponseSchema = z.object({
+  domainAutoJoinSync: z
+    .object({
+      usersMatched: z.number(),
+      usersProcessed: z.number(),
+    })
+    .optional(),
+});

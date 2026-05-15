@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { msg } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import { SubscriptionStatus } from '@prisma/client';
-import { Link, Outlet } from 'react-router';
+import { Link, Outlet, useParams } from 'react-router';
 
 import {
   DEFAULT_MINIMUM_ENVELOPE_ITEM_COUNT,
@@ -15,11 +15,13 @@ import { TrpcProvider } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
 
 import { GenericErrorLayout } from '~/components/general/generic-error-layout';
+import { TeamAccessDeniedScreen } from '~/components/general/team-access-denied-screen';
 import { useOptionalCurrentTeam } from '~/providers/team';
 
 export default function Layout() {
   const team = useOptionalCurrentTeam();
   const organisation = useOptionalCurrentOrganisation();
+  const params = useParams();
 
   const limits = useMemo(() => {
     if (!organisation) {
@@ -51,6 +53,10 @@ export default function Layout() {
       maximumEnvelopeItemCount: DEFAULT_MINIMUM_ENVELOPE_ITEM_COUNT,
     };
   }, [organisation?.subscription]);
+
+  if (!team && params.teamUrl) {
+    return <TeamAccessDeniedScreen teamUrl={params.teamUrl} />;
+  }
 
   if (!team) {
     return (

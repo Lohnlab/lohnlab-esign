@@ -6,6 +6,7 @@ import { prisma } from '@documenso/prisma';
 import { SALT_ROUNDS } from '../../constants/auth';
 import { AppError, AppErrorCode } from '../../errors/app-error';
 import { createPersonalOrganisation } from '../organisation/create-organisation';
+import { tryDomainAutoJoinForNewUser } from '../team/sync-domain-auto-join-for-team';
 
 export interface CreateUserOptions {
   name: string;
@@ -67,6 +68,10 @@ export const createUser = async ({ name, email, password, signature }: CreateUse
  */
 export const onCreateUserHook = async (user: User) => {
   await createPersonalOrganisation({ userId: user.id });
+
+  await tryDomainAutoJoinForNewUser({ userId: user.id }).catch((err) => {
+    console.error(err);
+  });
 
   return user;
 };

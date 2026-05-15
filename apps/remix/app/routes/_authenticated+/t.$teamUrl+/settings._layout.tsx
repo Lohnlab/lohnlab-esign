@@ -1,6 +1,7 @@
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
+  AtSignIcon,
   BracesIcon,
   Globe2Icon,
   GroupIcon,
@@ -85,6 +86,11 @@ export default function TeamsSettingsLayout() {
       path: `/t/${team.url}/settings/members`,
       label: t`Members`,
       icon: Users2Icon,
+    },
+    {
+      path: `/t/${team.url}/settings/domain-auto-join`,
+      label: t`Domain-Auto-Join`,
+      icon: AtSignIcon,
     },
     {
       path: `/t/${team.url}/settings/groups`,

@@ -7,6 +7,7 @@ import {
   USER_SIGNUP_VERIFICATION_TOKEN_IDENTIFIER,
 } from '../../constants/email';
 import { jobsClient } from '../../jobs/client';
+import { tryDomainAutoJoinForNewUser } from '../team/sync-domain-auto-join-for-team';
 
 export type VerifyEmailProps = {
   token: string;
@@ -106,6 +107,10 @@ export const verifyEmail = async ({ token }: VerifyEmailProps) => {
   if (!updatedUser) {
     throw new Error('Something went wrong while verifying your email. Please try again.');
   }
+
+  await tryDomainAutoJoinForNewUser({ userId: updatedUser.id }).catch((err) => {
+    console.error(err);
+  });
 
   return {
     state: EMAIL_VERIFICATION_STATE.VERIFIED,
