@@ -29,14 +29,17 @@ const getAuthSecret = () => {
 /**
  * Generic auth session cookie options.
  */
-export const sessionCookieOptions = {
+const sessionCookieBaseOptions = {
   httpOnly: true,
   path: '/',
   sameSite: useSecureCookies ? 'none' : 'lax',
   secure: useSecureCookies,
   domain: getCookieDomain(),
-  expires: new Date(Date.now() + AUTH_SESSION_LIFETIME),
 } as const;
+
+export const sessionCookieOptions = sessionCookieBaseOptions;
+
+const getSessionCookieExpires = () => new Date(Date.now() + AUTH_SESSION_LIFETIME);
 
 export const extractSessionCookieFromHeaders = (headers: Headers): string | null => {
   return extractCookieFromHeaders(sessionCookieName, headers);
@@ -61,13 +64,10 @@ export const getSessionCookie = async (c: Context): Promise<string | null> => {
  * @param sessionToken - The session token to set.
  */
 export const setSessionCookie = async (c: Context, sessionToken: string) => {
-  await setSignedCookie(
-    c,
-    sessionCookieName,
-    sessionToken,
-    getAuthSecret(),
-    sessionCookieOptions,
-  ).catch((err) => {
+  await setSignedCookie(c, sessionCookieName, sessionToken, getAuthSecret(), {
+    ...sessionCookieBaseOptions,
+    expires: getSessionCookieExpires(),
+  }).catch((err) => {
     appLog('SetSessionCookie', `Error setting signed cookie: ${err}`);
 
     throw err;
